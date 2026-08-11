@@ -7,11 +7,11 @@
 		<artifactId>spring-boot-starter-parent</artifactId>
 		<version>3.5.9</version>
 		<relativePath/> </parent>
-	<groupId>com.example</groupId>
+	<groupId>com.vidmind</groupId>
 	<artifactId>server</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>server</name>
-	<description>MediaCore Server</description>
+	<description>VidMind Server</description>
 
 	<properties>
 		<java.version>21</java.version>
@@ -132,7 +132,7 @@
 							<rules>
 								<requireJavaVersion>
 									<version>[21,)</version>
-									<message>DoVideoAI backend requires JDK 21 or newer.</message>
+									<message>VidMind backend requires JDK 21 or newer.</message>
 								</requireJavaVersion>
 							</rules>
 						</configuration>

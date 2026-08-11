@@ -1,6 +1,6 @@
-# DoVideoAI Web
+# VidMind Web
 
-DoVideoAI 的 Vue 3 前端，包含视频上传、Agent 分析、证据查看与继续追问。
+VidMind 的 Vue 3 前端，包含视频上传、Agent 分析、证据查看与继续追问。
 
 ```bash
 npm ci
