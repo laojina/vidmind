@@ -50,9 +50,9 @@ public class AuthService {
     public AuthResponse register(AuthRequest request) {
         String username = normalizeUsername(request.username());
         String password = request.password();
-        if (username == null || password == null || password.length() < 8
+        if (username == null || password == null || password.length() < 4
                 || password.length() > MAX_PASSWORD_LENGTH) {
-            return response(400, "账号需为 3-32 位字母、数字或下划线，密码需为 8-128 位", null, null);
+            return response(400, "账号需为 3-32 位字母、数字或下划线，密码需为 4-128 位", null, null);
         }
 
         String nickname = normalizeNickname(request.nickname());

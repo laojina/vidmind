@@ -6,8 +6,8 @@
     <header class="navbar">
       <div class="nav-content">
         <div class="brand">
-          <span class="brand-do">DO</span>
-          <span class="brand-video">Video</span>
+          <span class="brand-do">Vid</span>
+          <span class="brand-video">Mind</span>
           <span class="beta-badge">PRO</span>
         </div>
 

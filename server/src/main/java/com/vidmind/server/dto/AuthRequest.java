@@ -19,7 +19,7 @@ public record AuthRequest(
 
         @NotBlank(message = "密码不能为空", groups = {Login.class, Register.class})
         @Size(max = 128, message = "密码不能超过 128 位", groups = {Login.class, Register.class})
-        @Size(min = 8, message = "密码需至少 8 位", groups = Register.class)
+        @Size(min = 4, message = "密码需至少 4 位", groups = Register.class)
         String password,
 
         @Size(max = 50, message = "昵称不能超过 50 个字符", groups = Register.class)
