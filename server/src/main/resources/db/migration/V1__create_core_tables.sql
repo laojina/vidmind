@@ -1,0 +1,55 @@
+CREATE TABLE IF NOT EXISTS users (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    username VARCHAR(32) NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    nickname VARCHAR(50) NOT NULL,
+    avatar VARCHAR(512) NULL,
+    role VARCHAR(32) NOT NULL DEFAULT 'USER',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_users_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS media_files (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    filename VARCHAR(255) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    file_path VARCHAR(1024) NOT NULL,
+    content_hash VARCHAR(64) NULL,
+    ai_summary LONGTEXT NULL,
+    transcript_text LONGTEXT NULL,
+    cover_url VARCHAR(1024) NULL,
+    upload_time TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    KEY idx_media_content_hash (content_hash),
+    KEY idx_media_user_time (user_id, upload_time),
+    KEY idx_media_status_time (status, upload_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS agent_checkpoints (
+    media_id BIGINT NOT NULL,
+    checkpoint_key VARCHAR(160) NOT NULL,
+    stage VARCHAR(64) NOT NULL,
+    payload LONGTEXT NULL,
+    updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (media_id, checkpoint_key),
+    KEY idx_agent_checkpoint_updated (updated_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS failed_analysis_tasks (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    media_id BIGINT NOT NULL,
+    action VARCHAR(32) NOT NULL,
+    mode VARCHAR(32) NOT NULL DEFAULT 'GENERAL',
+    content_hash VARCHAR(128) NOT NULL,
+    user_goal VARCHAR(500) NOT NULL,
+    attempt_count INT NOT NULL,
+    error_type VARCHAR(128) NOT NULL,
+    error_message VARCHAR(1000) NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'FAILED',
+    created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    KEY idx_failed_analysis_status_time (status, created_at),
+    KEY idx_failed_analysis_media (media_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
