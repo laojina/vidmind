@@ -2,7 +2,6 @@
   <h2>VidMind</h2>
   
   <p>
-    <img src="https://img.shields.io/badge/Origin-DoVideoAI%20fork-21A5D3?style=flat-square" alt="基于开源 DoVideoAI 二次开发">
     <img src="https://img.shields.io/badge/Java-21-E76F00?style=flat-square" alt="Java 21">
     <img src="https://img.shields.io/badge/Spring%20Boot-3.5.9-6DB33F?style=flat-square" alt="Spring Boot 3.5.9">
     <img src="https://img.shields.io/badge/Vue-3-42B883?style=flat-square" alt="Vue 3">
