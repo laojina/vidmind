@@ -22,11 +22,20 @@ public class YtDlpUtils {
 
     private final String ytDlpPath;
     private final String ffmpegDir;
+    private final String proxy;
+    private final String userAgent;
+    private final String extraArgs;
 
     public YtDlpUtils(@Value("${tool.ytdlp.path}") String ytDlpPath,
-                      @Value("${tool.ffmpeg.dir}") String ffmpegDir) {
+                      @Value("${tool.ffmpeg.dir}") String ffmpegDir,
+                      @Value("${tool.ytdlp.proxy:}") String proxy,
+                      @Value("${tool.ytdlp.user-agent:}") String userAgent,
+                      @Value("${tool.ytdlp.extra-args:}") String extraArgs) {
         this.ytDlpPath = ytDlpPath;
         this.ffmpegDir = ffmpegDir;
+        this.proxy = proxy;
+        this.userAgent = userAgent;
+        this.extraArgs = extraArgs;
     }
 
     public File downloadVideo(String url) throws Exception {
@@ -45,8 +54,10 @@ public class YtDlpUtils {
         // Prefer the broadly supported H.264/AVC + AAC combination for imported
         // videos. Merely changing an AV1 file's container to MP4 does not make it
         // playable in Safari on every macOS and hardware combination.
+        // 末尾的 /b 是兜底：抖音等平台只提供 H.265/bytevc1，前几档 avc1 全不匹配时
+        // 退回任意可用最佳格式，避免整条解析链路直接失败。
         command.add("-f");
-        command.add("bv*[vcodec^=avc1][ext=mp4]+ba[acodec^=mp4a][ext=m4a]/b[vcodec^=avc1][ext=mp4]/bv*[vcodec^=avc1]+ba[acodec^=mp4a]");
+        command.add("bv*[vcodec^=avc1][ext=mp4]+ba[acodec^=mp4a][ext=m4a]/b[vcodec^=avc1][ext=mp4]/bv*[vcodec^=avc1]+ba[acodec^=mp4a]/b");
         command.add("--merge-output-format");
         command.add("mp4");
         command.add("--recode-video");
@@ -54,6 +65,24 @@ public class YtDlpUtils {
         if (ffmpegDir != null && !ffmpegDir.isBlank()) {
             command.add("--ffmpeg-location");
             command.add(ffmpegDir);
+        }
+        // 网络出口与反爬定制：direct/none 表示强制直连（绕开系统环境变量里的失效代理），
+        // 其余非空值视为显式代理地址；留空则沿用 yt-dlp 默认行为（跟随环境变量）。
+        if ("direct".equalsIgnoreCase(proxy) || "none".equalsIgnoreCase(proxy)) {
+            command.add("--proxy");
+            command.add("");
+        } else if (proxy != null && !proxy.isBlank()) {
+            command.add("--proxy");
+            command.add(proxy);
+        }
+        if (userAgent != null && !userAgent.isBlank()) {
+            command.add("--user-agent");
+            command.add(userAgent);
+        }
+        if (extraArgs != null && !extraArgs.isBlank()) {
+            for (String arg : extraArgs.trim().split("\\s+")) {
+                command.add(arg);
+            }
         }
         command.add("-o");
         command.add(outputPath.toString());
