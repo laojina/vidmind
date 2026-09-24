@@ -37,7 +37,7 @@ flowchart LR
 5. Agent 先检索相关证据，再按 Planner-Executor-Critic 循环生成并校验结论。
 6. 每个阶段写入 MySQL Checkpoint，前端通过 SSE 实时看到进度。
 
-## 面试口径
+## 设计要点
 
 - MySQL 是事实源，Redis 是临时状态和提速层，MinIO 管大文件，Qdrant 管语义召回，RocketMQ 管异步解耦。
 - 任务提交接口不等待分析完成，这是把长任务从 HTTP 同步链路中剥离的关键。
