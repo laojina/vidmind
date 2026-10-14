@@ -82,7 +82,8 @@ public class AuthService {
 
     public AuthResponse login(AuthRequest request) {
         String username = normalizeUsername(request.username());
-        if (username == null || request.password() == null || request.password().isBlank()) {
+        if (username == null || request.password() == null || request.password().isBlank()
+                || request.password().length() > MAX_PASSWORD_LENGTH) {
             return response(400, "请输入账号和密码", null, null);
         }
         if (!loginAttemptAllowed(username)) {
