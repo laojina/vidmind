@@ -103,16 +103,30 @@ public class VideoAnalysisConsumer implements RocketMQListener<AnalysisTaskMsg> 
         try {
             acquired = lock.tryLock();
             if (!acquired) {
-                log.info("video_analysis_skipped mediaId={} acquired={}", mediaId, acquired);
-                return;
+                // A competing worker may belong to a different mediaId. ACK would lose this result.
+                log.info("video_analysis_lock_contended mediaId={}", mediaId);
+                throw new IllegalStateException("分析任务锁被占用，等待消息队列重投");
             }
             if (!mediaService.exists(mediaId)) {
                 log.info("video_analysis_discarded_deleted_media mediaId={}", mediaId);
                 return;
             }
+            // Durable result guards against redelivery even after the Redis completed key expires.
+            AgentState ownResult = msg.isRevision() ? null
+                    : checkpointService.loadResult(mediaId, msg.getUserGoal(), mode);
+            if (ownResult != null && ownResult.result() != null) {
+                taskEventService.publishAnalysis(mediaId, msg.getUserGoal(), mode,
+                        TaskStatus.completed(ownResult), TaskStage.COMPLETED_REUSED);
+                log.info("video_analysis_duplicate_completed mediaId={}", mediaId);
+                return;
+            }
             Long currentAttempt = redisTemplate.opsForValue().increment(attemptsKey);
             attempt = currentAttempt == null ? 1 : currentAttempt;
             redisTemplate.expire(attemptsKey, ACTIVE_TTL);
+            if (attempt > MAX_DELIVERY_ATTEMPTS) {
+                // DLQ dispatch may itself fail. Retry the failure handoff, not expensive model work.
+                throw new IllegalStateException("执行次数已耗尽，仅重试失败任务转存");
+            }
             taskEventService.publishAnalysis(mediaId, msg.getUserGoal(), mode,
                     TaskStatus.of(TaskStatus.State.PROCESSING, "视频分析任务开始执行"),
                     TaskStage.CONSUMING);
@@ -204,9 +218,11 @@ public class VideoAnalysisConsumer implements RocketMQListener<AnalysisTaskMsg> 
             throw new IllegalStateException("视频分析消费失败", e);
         } finally {
             if (acquired) {
-                if (!retrying) redisTemplate.delete(java.util.List.of(activeKey, attemptsKey));
-                if (lock.isHeldByCurrentThread()) {
-                    lock.unlock();
+                try {
+                    if (!retrying) redisTemplate.delete(java.util.List.of(activeKey, attemptsKey));
+                } finally {
+                    // Cache cleanup failure must never strand the worker's distributed lock.
+                    if (lock.isHeldByCurrentThread()) lock.unlock();
                 }
             }
         }
@@ -215,7 +231,7 @@ public class VideoAnalysisConsumer implements RocketMQListener<AnalysisTaskMsg> 
     /** 结构性校验：返回拒绝原因，合法则返回 null。 */
     private String rejectionReason(AnalysisTaskMsg msg) {
         if (msg == null) return "消息体为空";
-        if (msg.getMediaId() == null) return "缺少 mediaId";
+        if (msg.getMediaId() == null || msg.getMediaId() <= 0) return "mediaId 必须为正数";
         if (msg.getUserGoal() == null || msg.getUserGoal().isBlank()) return "缺少分析目标";
         if (!msg.hasSupportedAction()) return "不支持的 action=" + msg.getAction();
         return null;
