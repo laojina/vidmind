@@ -20,7 +20,7 @@
           </button>
 
           <div v-else class="user-profile">
-            <span class="user-name">:: {{ currentUser.nickname }} ::</span>
+            <span class="user-name">{{ currentUser.nickname }}</span>
             <button class="logout-btn" @click="logout" title="退出登录" aria-label="退出登录">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
             </button>
@@ -35,9 +35,9 @@
     </header>
 
     <main class="main-container">
-      <section class="hero-section">
-        <h1 class="slogan-main">把视频变成结构化的知识</h1>
-        <p class="slogan-sub">上传视频，AI 提取语音与画面，按你的目标生成可溯源的分析产物</p>
+      <section class="hero-section" :class="{ 'has-library': currentUser }">
+        <h1 class="slogan-main">把视频变成<span>结构化的知识</span></h1>
+        <p class="slogan-sub">从课程、会议与讲解视频中，提炼带时间戳的结论与学习笔记</p>
         <div v-if="!currentUser" class="login-hint">
           <span>尚未登录</span>
           <button type="button" @click="openAuthModal">登录后开始你的第一次视频解析 →</button>
@@ -47,8 +47,9 @@
           <input
               type="file"
               id="file-input"
+              ref="fileInput"
               @change="handleFileChange"
-              accept="video/*"
+              accept="video/*,.mp4,.mov,.mkv,.avi,.webm,.m4v"
               hidden
           />
 
@@ -60,48 +61,17 @@
               @dragleave.prevent="handleDragLeave"
               @drop.prevent="handleDrop"
           >
-            <div class="split-container" v-if="!uploading">
-
-              <label for="file-input" class="skew-pane pane-local">
-                <div class="pane-content unskew">
-                  <div class="magnet-icon">
-                    <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                  </div>
-                  <span class="magnet-title">LOCAL FILE</span>
-                  <span class="magnet-desc">{{ isDragOver ? '松手上传' : '点击 / 拖拽本地文件' }}</span>
-                </div>
-              </label>
-
-              <div class="split-gap"></div>
-
-              <div class="skew-pane pane-url">
-                <div class="pane-content unskew">
-                  <div class="magnet-icon">
-                    <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path></svg>
-                  </div>
-                  <span class="magnet-title">WEB LINK</span>
-                  <span class="magnet-desc">B站 / YouTube / 抖音</span>
-
-                  <div class="url-input-box" @click.stop>
-                    <input
-                        v-model="videoUrl"
-                        type="text"
-                        inputmode="url"
-                        autocomplete="off"
-                        spellcheck="false"
-                        placeholder="粘贴视频链接..."
-                        aria-label="视频链接"
-                        :disabled="uploading"
-                        @keyup.enter="handleUrlUpload"
-                    />
-                    <button class="url-go-btn" :disabled="uploading" @click="handleUrlUpload" aria-label="解析视频链接">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-            </div>
+            <button type="button" class="local-upload" v-if="!uploading" @click="chooseLocalVideo" aria-describedby="upload-guidance">
+              <span class="pane-content">
+                <span class="magnet-icon">
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                </span>
+                <span class="magnet-title">{{ isDragOver ? '松开即可上传' : '上传你的视频' }}</span>
+                <span class="magnet-desc">拖拽视频到这里，或点击选择本地文件</span>
+                <span class="upload-select">{{ currentUser ? '选择视频文件' : '登录并上传视频' }} <span aria-hidden="true">↗</span></span>
+                <span id="upload-guidance" class="upload-guidance">MP4、MOV、MKV、AVI、WebM、M4V · 最大 {{ formatBytes(MAX_UPLOAD_BYTES) }} · 每次一个视频</span>
+              </span>
+            </button>
 
             <div class="magnet-content busy" v-else>
               <div class="quantum-loader"></div>
@@ -134,6 +104,11 @@
             <button type="button" @click="discardResumableUpload">重新开始</button>
           </div>
         </div>
+        <ol class="workflow-guide" aria-label="使用流程">
+          <li><span>01</span>上传视频</li>
+          <li><span>02</span>设定分析目标</li>
+          <li><span>03</span>查看结论与证据</li>
+        </ol>
         <transition name="toast-pop">
           <div
               v-if="message"
@@ -151,16 +126,19 @@
 
       <section v-if="list.length > 0 || currentUser" class="workspace-section">
         <div class="section-header">
-          <div class="library-title">
-            <h3>视频资料库</h3>
-            <div class="count-chip">{{ list.length }} 个视频</div>
+          <div class="library-heading">
+            <div class="library-title">
+              <h3>视频资料库</h3>
+              <div class="count-chip">{{ searchQuery.trim() ? `${visibleList.length} / ${list.length}` : `${list.length} 个视频` }}</div>
+            </div>
+            <p class="library-caption">你的分析素材与任务，都在这里</p>
           </div>
           <label class="library-search">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             <input v-model="searchQuery" type="search" placeholder="搜索视频名称" aria-label="搜索视频名称" />
           </label>
         </div>
-        <div class="card-grid">
+        <div v-if="visibleList.length" class="card-grid">
           <div v-for="item in visibleList" :key="item.id" class="project-card">
 
             <button
@@ -195,6 +173,21 @@
 
             <div class="action-dock">
               <button
+                  class="dock-item ai-core"
+                  :disabled="item.status !== 'COMPLETED'"
+                  :title="actionTitle(item, '打开 Video Agent')"
+                  @click="openAgent(item)"
+              >
+                <span class="item-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>
+                </span>
+                <div class="label-group">
+                  <span class="item-label">开始分析</span>
+                </div>
+
+              </button>
+
+              <button
                   class="dock-item"
                   :disabled="item.status !== 'COMPLETED'"
                   :title="actionTitle(item, '下载音频')"
@@ -218,25 +211,28 @@
                 <span class="item-label">提取文字</span>
               </button>
 
-              <button
-                  class="dock-item ai-core"
-                  :disabled="item.status !== 'COMPLETED'"
-                  :title="actionTitle(item, '打开 Video Agent')"
-                  @click="openAgent(item)"
-              >
-                <span class="item-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>
-                </span>
-                <div class="label-group">
-                  <span class="item-label">Video Agent</span>
-                </div>
-                <div class="shimmer"></div>
-              </button>
+
             </div>
           </div>
         </div>
-        <div v-if="visibleList.length === 0" class="library-empty">
-          <p>没有找到“{{ searchQuery }}”</p>
+        <div v-if="listLoading && !list.length" class="library-empty" role="status">
+          <div class="quantum-loader small"></div>
+          <h4>正在加载视频资料库</h4>
+        </div>
+        <div v-else-if="listError && !list.length" class="library-empty" role="alert">
+          <h4>暂时无法加载资料库</h4>
+          <p>{{ listError }}</p>
+          <button type="button" @click="fetchList()">重新加载</button>
+        </div>
+        <div v-else-if="!list.length" class="library-empty">
+          <span class="empty-library-icon" aria-hidden="true">＋</span>
+          <h4>从你的第一个视频开始</h4>
+          <p>上传后，就可以提取文字、下载音频，或按你的目标开始分析。</p>
+          <button type="button" :disabled="uploading" @click="chooseLocalVideo">上传第一个视频</button>
+        </div>
+        <div v-else-if="visibleList.length === 0" class="library-empty">
+          <h4>没有找到匹配的视频</h4>
+          <p>试试其他关键词，或清除“{{ searchQuery }}”查看全部视频。</p>
           <button type="button" @click="searchQuery = ''">清除搜索</button>
         </div>
       </section>
@@ -245,13 +241,35 @@
       <div
           ref="sidebarPanel"
           class="sidebar-panel"
-          :class="{ 'is-open': sidebar.visible }"
+          :class="{ 'is-open': sidebar.visible, 'is-resizing': sidebarResizing }"
+          :style="{ '--sidebar-width': `${sidebarWidth}px` }"
           :inert="!sidebar.visible"
           role="dialog"
           aria-modal="true"
           tabindex="-1"
           :aria-label="sidebar.title || '任务详情'"
       >
+        <div
+            class="sidebar-resize-handle"
+            role="separator"
+            aria-label="调整分析面板宽度，左箭头加宽，右箭头缩窄"
+            aria-orientation="vertical"
+            :aria-valuenow="Math.round(sidebarWidth)"
+            :aria-valuemin="Math.round(sidebarMinWidth)"
+            :aria-valuemax="Math.round(sidebarMaxWidth)"
+            tabindex="0"
+            title="向左拖动加宽 · 双击恢复默认宽度"
+            @pointerdown="startSidebarResize"
+            @pointermove="moveSidebarResize"
+            @pointerup="stopSidebarResize"
+            @pointercancel="stopSidebarResize"
+            @lostpointercapture="stopSidebarResize"
+            @keydown.left.prevent="adjustSidebarWidth(40)"
+            @keydown.right.prevent="adjustSidebarWidth(-40)"
+            @keydown.home.prevent="setSidebarWidth(sidebarMinWidth)"
+            @keydown.end.prevent="setSidebarWidth(sidebarMaxWidth)"
+            @dblclick="resetSidebarWidth"
+        ><span aria-hidden="true">⋮</span></div>
         <div class="sidebar-header">
           <div class="sidebar-title">
             <span class="icon" v-if="sidebar.type === 'ai'">
@@ -260,9 +278,15 @@
             <span class="icon" v-else>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
             </span>
-            {{ sidebar.title }}
+            <span class="sidebar-title-text" :title="sidebar.title">{{ sidebar.title }}</span>
           </div>
-          <button class="close-btn" @click="closeSidebar" aria-label="关闭分析面板">×</button>
+          <div class="sidebar-header-actions">
+            <button type="button" class="sidebar-expand-btn" :aria-pressed="sidebarExpanded" @click="toggleSidebarExpanded">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 16v5h5"/></svg>
+              {{ sidebarExpanded ? '还原宽度' : '展开阅读' }}
+            </button>
+            <button class="close-btn" @click="closeSidebar" aria-label="关闭分析面板">×</button>
+          </div>
         </div>
         <div ref="sidebarBody" class="sidebar-body">
           <div v-if="sidebar.type === 'ai'" class="video-evidence">
@@ -495,7 +519,7 @@
         <span class="footer-dot">·</span>
         <span>目标驱动的视频解析工作台</span>
         <span class="footer-dot">·</span>
-        <span>Spring Boot 3 / Vue 3 / RocketMQ / Qdrant</span>
+        <span>让每一次观看，都留下收获</span>
       </footer>
     </main>
   </div>
@@ -505,6 +529,7 @@
 import { computed, nextTick, ref, watch, onMounted, onUnmounted } from 'vue'
 import { apiRequest, clearAuthToken, hasAuthToken, setAuthToken } from './api'
 import {
+  MAX_UPLOAD_BYTES,
   forgetUploadProgress,
   formatBytes,
   formatDurationText,
@@ -519,8 +544,8 @@ import { useAnalysisWorkspace } from './useAnalysisWorkspace'
 // --- 变量定义 ---
 const DEMO_MODE = new URLSearchParams(window.location.search).has('demo')
 const MESSAGE_TIMEOUT_MS = 4000
+const fileInput = ref(null)
 const file = ref(null)
-const videoUrl = ref('')
 const message = ref('')
 const messageIsError = ref(false)
 const uploading = ref(false)
@@ -529,10 +554,78 @@ const uploadAbort = ref(null)
 const resumableFile = ref(null)
 const resumableChunks = ref({ done: 0, total: 0 })
 const list = ref([])
+const listLoading = ref(false)
+const listError = ref('')
 const searchQuery = ref('')
 const videoPlayer = ref(null)
 const sidebarPanel = ref(null)
 const sidebarBody = ref(null)
+const PANEL_WIDTH_KEY = 'vidmind:analysis-panel-width'
+const viewportWidth = ref(window.innerWidth)
+const sidebarExpanded = ref(false)
+const sidebarResizing = ref(false)
+const preferredSidebarWidth = ref(null)
+try {
+  const savedWidth = Number(localStorage.getItem(PANEL_WIDTH_KEY))
+  if (Number.isFinite(savedWidth) && savedWidth > 0) preferredSidebarWidth.value = savedWidth
+} catch { /* 存储不可用时仍可调整当前面板。 */ }
+const sidebarMaxWidth = computed(() => viewportWidth.value <= 860 ? viewportWidth.value : viewportWidth.value - 24)
+const sidebarMinWidth = computed(() => Math.min(640, sidebarMaxWidth.value))
+const sidebarWidth = computed(() => {
+  if (viewportWidth.value <= 860 || sidebarExpanded.value) return sidebarMaxWidth.value
+  const preferred = preferredSidebarWidth.value ?? Math.max(960, viewportWidth.value * 0.75)
+  return Math.round(Math.min(sidebarMaxWidth.value, Math.max(sidebarMinWidth.value, preferred)))
+})
+let sidebarResize = null
+const persistSidebarWidth = () => {
+  try {
+    if (preferredSidebarWidth.value === null) localStorage.removeItem(PANEL_WIDTH_KEY)
+    else localStorage.setItem(PANEL_WIDTH_KEY, String(preferredSidebarWidth.value))
+  } catch { /* 保存偏好失败不影响当前布局。 */ }
+}
+const setSidebarWidth = width => {
+  sidebarExpanded.value = false
+  preferredSidebarWidth.value = Math.min(sidebarMaxWidth.value, Math.max(sidebarMinWidth.value, width))
+  persistSidebarWidth()
+}
+const adjustSidebarWidth = amount => setSidebarWidth(sidebarWidth.value + amount)
+const stopSidebarResize = event => {
+  if (!sidebarResize || (event?.pointerId !== undefined && event.pointerId !== sidebarResize.pointerId)) return
+  const previous = sidebarResize
+  sidebarResize = null
+  sidebarResizing.value = false
+  document.body.classList.remove('sidebar-resizing')
+  if (previous.target.hasPointerCapture(previous.pointerId)) previous.target.releasePointerCapture(previous.pointerId)
+  persistSidebarWidth()
+}
+const startSidebarResize = event => {
+  if (event.button !== 0 || viewportWidth.value <= 860) return
+  event.preventDefault()
+  sidebarResize = { pointerId: event.pointerId, x: event.clientX, width: sidebarWidth.value, target: event.currentTarget }
+  sidebarExpanded.value = false
+  sidebarResizing.value = true
+  event.currentTarget.setPointerCapture(event.pointerId)
+  document.body.classList.add('sidebar-resizing')
+}
+const moveSidebarResize = event => {
+  if (!sidebarResize || event.pointerId !== sidebarResize.pointerId) return
+  preferredSidebarWidth.value = Math.min(sidebarMaxWidth.value, Math.max(sidebarMinWidth.value,
+    sidebarResize.width + sidebarResize.x - event.clientX))
+}
+const resetSidebarWidth = () => {
+  stopSidebarResize()
+  sidebarExpanded.value = false
+  preferredSidebarWidth.value = null
+  persistSidebarWidth()
+}
+const toggleSidebarExpanded = () => {
+  stopSidebarResize()
+  sidebarExpanded.value = !sidebarExpanded.value
+}
+const handleViewportResize = () => {
+  stopSidebarResize()
+  viewportWidth.value = window.innerWidth
+}
 const authPanel = ref(null)
 const deletingId = ref(null)
 const isOffline = ref(typeof navigator !== 'undefined' && navigator.onLine === false)
@@ -582,7 +675,7 @@ const cardStatusClass = item => {
 }
 const cardStatusLabel = item => {
   const task = activeTaskOf(item.id)
-  if (task) return task.type === 'ai' ? 'ANALYZING' : 'TRANSCRIBING'
+  if (task) return task.type === 'ai' ? '分析中' : '转写中'
   return mediaStatusLabel(item.status)
 }
 const cardStatusTitle = item => {
@@ -669,10 +762,17 @@ const startUpload = async (selectedFile, extraFileCount = 0) => {
     showMsg(`一次只处理一个视频，已选择 ${selectedFile.name}，其余 ${extraFileCount} 个已忽略`)
   }
   file.value = selectedFile
-  videoUrl.value = ''
   await uploadFile()
 }
 
+const chooseLocalVideo = () => {
+  if (uploading.value) return
+  if (!currentUser.value) {
+    openAuthModal()
+    return
+  }
+  fileInput.value?.click()
+}
 const handleFileChange = async (e) => {
   const selected = e.target.files
   await startUpload(selected?.[0], Math.max(0, (selected?.length || 0) - 1))
@@ -797,83 +897,6 @@ const discardResumableUpload = () => {
   showMsg('已清除保留的上传进度，下次将从头开始')
 }
 
-const handleUrlUpload = async () => {
-  // 支持直接粘贴抖音/B站分享文本：从整段文字中自动抽出第一个 http/https 链接
-  let normalizedUrl = videoUrl.value.trim()
-  if (normalizedUrl && !/^https?:\/\//i.test(normalizedUrl)) {
-    const matched = normalizedUrl.match(/https?:\/\/[A-Za-z0-9\-._~:\/?#\[\]@!$&'()*+,;=%]+/i)
-    if (matched) {
-      normalizedUrl = matched[0].replace(/[.,;:!）]+$/, '')
-      videoUrl.value = normalizedUrl
-    }
-  }
-  if (!normalizedUrl) return
-  if (uploading.value) {
-    showMsg('已有上传任务在进行，请等当前任务结束', true)
-    return
-  }
-  if (DEMO_MODE) {
-    videoUrl.value = ''
-    showMsg('演示模式：已模拟完成链接解析')
-    return
-  }
-
-  if (!currentUser.value) {
-    showMsg('⚠️ 权限受限：请先登录系统', true)
-    openAuthModal()
-    return
-  }
-
-  let parsedUrl
-  try {
-    parsedUrl = new URL(normalizedUrl)
-  } catch {
-    parsedUrl = null
-  }
-  if (!parsedUrl || !['http:', 'https:'].includes(parsedUrl.protocol)) {
-    showMsg('⚠️ 请输入合法的 http/https 链接', true)
-    return
-  }
-
-  uploading.value = true
-  const uploadUserId = currentUser.value?.id
-  uploadProgress.value = {
-    label: '正在解析视频链接',
-    filename: parsedUrl.hostname,
-    percent: null,
-    detail: '服务端正在拉取源视频，时长取决于源站速度',
-    warning: ''
-  }
-  messageIsError.value = false
-  message.value = '正在解析链接并极速下载 (低码率模式)...'
-
-  const formData = new FormData()
-  formData.append('url', normalizedUrl)
-
-  try {
-    const res = await apiRequest('/media/upload-url', {
-      method: 'POST',
-      body: formData
-    })
-    if (!res.ok) throw new Error(await res.text())
-    const uploadedMedia = await res.json()
-    if (currentUser.value?.id !== uploadUserId) return
-
-    showMsg('✅ 链接资源已入库')
-    videoUrl.value = ''
-    await fetchList({ notify: true })
-    openAgent(uploadedMedia)
-  } catch (error) {
-    console.error(error)
-    if (currentUser.value?.id !== uploadUserId) return
-    let errMsg = error.message
-    if (errMsg.includes("Unsupported URL")) errMsg = "不支持该平台链接"
-    showMsg('❌ 解析失败: ' + errMsg, true)
-  } finally {
-    uploading.value = false
-  }
-}
-
 /** 成功提示自动消失；错误提示保留到用户点掉，避免关键失败原因 4 秒后就没了。 */
 const showMsg = (msg, isError = false) => {
   clearTimeout(messageTimer)
@@ -902,6 +925,8 @@ const fetchList = async ({ notify = false } = {}) => {
     list.value = []
     return list.value
   }
+  listLoading.value = true
+  listError.value = ''
   try {
     // 带时间戳绕开浏览器缓存，避免删除/新增之后列表还是旧的。
     const res = await apiRequest(`/media/list?_t=${Date.now()}`)
@@ -910,8 +935,11 @@ const fetchList = async ({ notify = false } = {}) => {
     list.value = await res.json()
   } catch (error) {
     console.error(error)
+    listError.value = '请检查网络连接，稍后重试。'
     if (notify) showMsg('视频资料库加载失败，请稍后刷新', true)
     return null
+  } finally {
+    listLoading.value = false
   }
   return list.value
 }
@@ -926,10 +954,10 @@ const mediaStatusClass = status => ['COMPLETED', 'PROCESSING', 'FAILED'].include
   ? status.toLowerCase()
   : 'unknown'
 const mediaStatusLabel = status => ({
-  COMPLETED: 'READY',
-  PROCESSING: 'PROCESSING',
-  FAILED: 'FAILED'
-})[status] || 'PENDING'
+  COMPLETED: '已就绪',
+  PROCESSING: '处理中',
+  FAILED: '处理失败'
+})[status] || '等待处理'
 
 const {
   sidebar,
@@ -1246,8 +1274,9 @@ const resetSessionState = () => {
   resetWorkspace()
   currentUser.value = null
   list.value = []
+  listLoading.value = false
+  listError.value = ''
   searchQuery.value = ''
-  videoUrl.value = ''
   file.value = null
   resumableFile.value = null
   resumableChunks.value = { done: 0, total: 0 }
@@ -1288,13 +1317,14 @@ const handleBeforeUnload = event => {
   event.returnValue = ''
 }
 
-// 打开弹层时挂上标记类，锁背景滚动的规则只在窄屏生效（见样式里的说明）。
+// 打开弹层时锁住背景滚动，只滚动当前面板。
 const overlayOpen = computed(() => sidebar.value.visible || showAuthModal.value)
 watch(overlayOpen, open => {
   document.body.classList.toggle('overlay-open', open)
 })
 
 watch(() => sidebar.value.visible, async visible => {
+  if (!visible) stopSidebarResize()
   if (visible) {
     focusBeforeSidebar = document.activeElement
     await nextTick()
@@ -1318,6 +1348,7 @@ watch(() => sidebar.value.loading, loading => {
 })
 
 onMounted(() => {
+  window.addEventListener('resize', handleViewportResize)
   window.addEventListener('auth-expired', handleAuthExpired)
   window.addEventListener('keydown', handleKeydown)
   window.addEventListener('online', handleOnline)
@@ -1339,6 +1370,8 @@ onMounted(() => {
   fetchList({ notify: Boolean(currentUser.value) })
 })
 onUnmounted(() => {
+  stopSidebarResize()
+  window.removeEventListener('resize', handleViewportResize)
   window.removeEventListener('auth-expired', handleAuthExpired)
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('online', handleOnline)
@@ -1401,25 +1434,16 @@ onUnmounted(() => {
 .slogan-main{margin:0;font-size:clamp(1.5rem,3vw,2.3rem);font-weight:800;letter-spacing:-.02em;color:var(--text-main);}
 .slogan-sub{margin:10px auto 0;color:var(--text-sub);font-size:1rem;max-width:640px;}
 
-/* ---------- 上传区：白卡 + 双栏 ---------- */
+/* ---------- 上传区：本地文件 ---------- */
 .upload-magnet{position:relative;margin:30px auto 0;max-width:880px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:22px;transition:border-color .2s,box-shadow .2s;}
 .upload-magnet.is-dragover{border-color:var(--primary);box-shadow:0 0 0 4px var(--primary-soft);}
 .upload-magnet.processing{border-color:var(--primary-border);}
-.split-container{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-.split-gap{display:none;}
-.skew-pane{transform:none;cursor:pointer;border:1.5px dashed var(--border-strong);border-radius:var(--radius);background:var(--bg-input);transition:border-color .2s,background .2s,transform .2s;display:block;}
-.pane-url{cursor:default;border-style:solid;}
-.skew-pane.pane-local:hover{border-color:var(--primary);background:var(--primary-soft);transform:translateY(-1px);}
+.local-upload{transform:none;cursor:pointer;border:1.5px dashed var(--border-strong);border-radius:var(--radius);background:var(--bg-input);transition:border-color .2s,background .2s,transform .2s;display:block;}
+.local-upload:hover{border-color:var(--primary);background:var(--primary-soft);transform:translateY(-1px);}
 .pane-content{transform:none;padding:26px 18px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;}
 .magnet-icon{width:42px;height:42px;border-radius:10px;background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center;}
 .magnet-title{font-weight:700;font-size:1rem;color:var(--text-main);}
 .magnet-desc{font-size:.83rem;color:var(--text-sub);}
-.url-input-box{display:flex;align-items:center;gap:8px;width:100%;max-width:340px;margin-top:6px;}
-.url-input-box input{flex:1;min-width:0;padding:9px 12px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-card);color:var(--text-main);font-size:.88rem;transition:border-color .15s,box-shadow .15s;}
-.url-input-box input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft);}
-.url-go-btn{width:38px;height:38px;flex:none;border:none;border-radius:var(--radius-sm);background:var(--primary);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;}
-.url-go-btn:hover:not(:disabled){background:var(--primary-hover);}
-.url-go-btn:disabled{opacity:.5;cursor:not-allowed;}
 .border-glow{display:none;}
 .magnet-content.busy{padding:10px 0;display:flex;flex-direction:column;align-items:center;gap:14px;}
 .busy-file{font-weight:600;color:var(--text-main);}
@@ -1487,11 +1511,11 @@ onUnmounted(() => {
 
 /* ---------- 右侧抽屉：Agent 面板 ---------- */
 .sidebar-backdrop{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(17,24,39,.45);z-index:998;}
-.sidebar-panel{position:fixed;top:0;right:-920px;width:880px;max-width:calc(100vw - 24px);height:100dvh;background:var(--bg-card);z-index:999;transition:right .35s cubic-bezier(.32,.72,0,1);display:flex;flex-direction:column;box-shadow:var(--shadow-lg);border-radius:var(--radius-lg) 0 0 var(--radius-lg);overflow:hidden;}
-.sidebar-panel.is-open{right:0;}
+.sidebar-panel{position:fixed;top:0;right:0;width:var(--sidebar-width,1120px);max-width:calc(100vw - 24px);height:100dvh;box-sizing:border-box;background:var(--bg-card);z-index:999;transform:translateX(105%);visibility:hidden;transition:transform .3s cubic-bezier(.32,.72,0,1),visibility .3s;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);border-radius:var(--radius-lg) 0 0 var(--radius-lg);overflow:hidden;}
+.sidebar-panel.is-open{transform:translateX(0);visibility:visible;}
 .sidebar-header{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--bg-card);}
 .sidebar-title{font-weight:700;font-size:1rem;display:flex;align-items:center;gap:10px;}
-.sidebar-body{flex:1;overflow-y:auto;padding:20px 24px 32px;}
+.sidebar-body{flex:1;min-height:0;min-width:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:20px 24px 32px;}
 .close-btn{border:none;background:var(--bg-subtle);color:var(--text-sub);width:32px;height:32px;border-radius:8px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;}
 .close-btn:hover{background:var(--danger-soft);color:var(--danger);}
 
@@ -1589,10 +1613,9 @@ onUnmounted(() => {
 
 /* ---------- 响应式 ---------- */
 @media (max-width:860px){
-  .split-container{grid-template-columns:1fr;}
   .main-container{padding:0 16px 60px;}
   .hero-section{padding:32px 0 4px;}
-  .sidebar-panel{width:100vw;max-width:100vw;right:-100vw;border-radius:0;}
+  .sidebar-panel{width:100vw;max-width:100vw;right:0;border-radius:0;}
   .card-grid{grid-template-columns:1fr;}
   .nav-content{padding:12px 16px;}
   .video-evidence{margin:-16px -16px 16px;padding:12px 16px;}
@@ -1610,7 +1633,118 @@ onUnmounted(() => {
 .login-hint button:hover{text-decoration:underline;}
 .app-footer{margin-top:72px;padding:22px 0 0;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:10px;font-size:.82rem;color:var(--text-faint);}
 .footer-dot{color:var(--border-strong);}
-.url-input-box{max-width:100%;}
 .pane-content{padding:24px 16px;}
 .library-empty .loading-hint{margin-top:6px;}
+
+/* ---------- 首页与资料库 ---------- */
+.hero-section{padding-top:44px;}
+.slogan-main span{color:var(--primary);}
+.hero-section::before{width:min(760px,100%);}
+.slogan-sub{max-width:700px;line-height:1.7;}
+.upload-magnet{max-width:none;margin-top:26px;padding:14px;box-shadow:0 4px 24px rgba(16,24,40,.045);}
+.local-upload{width:100%;font:inherit;color:inherit;border-color:var(--primary-border);background:#fafaff;}
+.local-upload:focus-visible{outline:3px solid var(--primary-border);outline-offset:4px;}
+.local-upload:hover{transform:none;}
+.pane-content{padding:26px 16px;gap:9px;}
+.magnet-icon{width:52px;height:52px;border-radius:15px;margin-bottom:3px;}
+.magnet-title{font-size:1.15rem;letter-spacing:.01em;}
+.magnet-desc{font-size:.9rem;line-height:1.6;}
+.upload-select{display:inline-flex;align-items:center;gap:20px;background:var(--primary);color:white;border-radius:9px;padding:10px 20px;font-weight:600;font-size:.88rem;margin:7px 0 5px;box-shadow:0 3px 8px rgba(79,70,229,.15);transition:background .15s;}
+.local-upload:hover .upload-select{background:var(--primary-hover);}
+.upload-guidance{font-size:.75rem;color:var(--text-sub);line-height:1.7;}
+.has-library .pane-content{display:grid;grid-template-columns:52px minmax(0,1fr) auto;column-gap:18px;row-gap:6px;padding:24px 26px;text-align:left;}
+.has-library .magnet-icon{grid-column:1;grid-row:1 / span 3;margin:0;}
+.has-library .magnet-title{grid-column:2;grid-row:1;}
+.has-library .magnet-desc{grid-column:2;grid-row:2;}
+.has-library .upload-select{grid-column:3;grid-row:1 / span 2;align-self:center;margin:0;}
+.has-library .upload-guidance{grid-column:2 / -1;grid-row:3;}
+.workflow-guide{padding:0;margin:20px auto 0;list-style:none;display:flex;justify-content:center;gap:36px;color:var(--text-sub);font-size:.8rem;}
+.workflow-guide li{display:flex;align-items:center;gap:8px;}
+.workflow-guide li>span{font-size:.7rem;color:var(--primary);background:var(--primary-soft);border-radius:50%;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;}
+.workspace-section{margin-top:38px;}
+.library-title h3{font-size:1.15rem;}
+.library-caption{margin:7px 0 0;font-size:.82rem;color:var(--text-sub);}
+.library-search{box-sizing:border-box;width:300px;padding:11px 14px;}
+.project-card{position:relative;}
+.card-meta{padding:22px 44px 22px 20px;align-items:center;min-height:68px;}
+.meta-info{gap:10px;}
+.filename-mask{font-weight:600;font-size:.92rem;white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.6;}
+.meta-icon{width:42px;height:48px;border-radius:10px;}
+.time-tag{padding:0;background:transparent;color:var(--text-sub);font-family:inherit;}
+.status-indicator{font-size:.72rem;padding:3px 8px;}
+.status-indicator::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;}
+.status-indicator.failed{color:var(--danger);background:var(--danger-soft);border-color:var(--danger-border);}
+.delete-btn{position:absolute;top:14px;right:10px;padding:7px;}
+.delete-btn:focus-visible{outline-color:var(--primary);}
+.action-dock{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:14px 16px 16px;}
+.action-dock .dock-item{justify-content:center;min-height:38px;box-sizing:border-box;padding:9px 8px;}
+.action-dock .ai-core{grid-column:1 / -1;flex-direction:row;gap:8px;background:var(--primary);border-color:var(--primary);color:white;}
+.action-dock .ai-core .item-label,.action-dock .ai-core .item-icon{color:inherit;}
+.action-dock .ai-core:hover:not(:disabled){background:var(--primary-hover);border-color:var(--primary-hover);color:white;}
+.action-dock .dock-item:focus-visible,.library-empty button:focus-visible{outline-color:var(--primary);}
+.library-empty h4{font-size:1rem;color:var(--text-main);margin:12px 0 8px;}
+.library-empty p{font-size:.88rem;line-height:1.7;margin:0 auto 20px;}
+.library-empty button{font:inherit;font-size:.85rem;font-weight:600;color:var(--primary);background:var(--primary-soft);border:1px solid var(--primary-border);padding:10px 18px;border-radius:9px;cursor:pointer;}
+.library-empty button:disabled{opacity:.45;cursor:not-allowed;}
+.empty-library-icon{display:inline-flex;align-items:center;justify-content:center;background:var(--primary-soft);color:var(--primary);width:44px;height:44px;border-radius:13px;font-size:1.6rem;}
+.app-footer{margin-top:48px;flex-wrap:wrap;line-height:1.6;}
+@media(max-width:600px){
+  .has-library .pane-content{display:flex;padding:24px 10px;}
+  .has-library .upload-select{margin:7px 0 5px;}
+  .has-library .magnet-icon{margin-bottom:3px;}
+  .hero-section{padding-top:28px;}
+  .slogan-main{font-size:1.55rem;line-height:1.5;}
+  .slogan-sub{font-size:.85rem;margin-top:8px;}
+  .upload-magnet{padding:10px;margin-top:22px;}
+  .pane-content{padding:24px 10px;}
+  .magnet-desc{font-size:.81rem;}
+  .upload-guidance{max-width:250px;}
+  .workflow-guide{gap:12px;font-size:.7rem;flex-wrap:wrap;}
+  .workflow-guide li{gap:5px;}
+  .workflow-guide li>span{width:21px;height:21px;}
+  .workspace-section{margin-top:30px;}
+  .section-header{align-items:stretch;gap:14px;}
+  .library-heading,.library-search{width:100%;}
+  .library-search{padding:10px 12px;}
+  .login-hint{padding:10px 12px;font-size:.75rem;gap:7px;flex-wrap:wrap;justify-content:center;}
+  .login-hint button{font-size:inherit;}
+  .card-grid{grid-template-columns:minmax(0,1fr);}
+  .library-empty{padding:32px 18px;}
+  .nav-content{gap:10px;}
+  .nav-controls{gap:8px;}
+  .beta-badge{display:none;}
+  .user-profile{gap:4px;min-width:0;}
+  .user-name{max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .status-pill{font-size:.68rem;padding:6px 8px;white-space:nowrap;flex-shrink:0;}
+  .auth-btn{padding:7px 10px;}
+  .app-footer{gap:6px;font-size:.7rem;}
+}
+
+/* ---------- 可调整的分析面板与完整视频画面 ---------- */
+body.overlay-open{overflow:hidden;}
+body.sidebar-resizing,body.sidebar-resizing *{cursor:ew-resize !important;user-select:none !important;}
+.sidebar-resize-handle{position:absolute;left:0;top:0;bottom:0;width:12px;z-index:3;cursor:ew-resize;touch-action:none;display:flex;align-items:center;justify-content:center;outline:none;}
+.sidebar-resize-handle::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:transparent;transition:background .15s;}
+.sidebar-resize-handle span{padding:8px 1px;color:var(--text-sub);background:var(--bg-subtle);border:1px solid var(--border);border-radius:5px;font-size:17px;line-height:1;}
+.sidebar-resize-handle:hover::before,.sidebar-resize-handle:focus-visible::before,.sidebar-panel.is-resizing .sidebar-resize-handle::before{background:var(--primary);}
+.sidebar-resize-handle:focus-visible span{color:var(--primary);border-color:var(--primary);}
+.sidebar-header{gap:16px;padding-left:28px;flex-shrink:0;}
+.sidebar-title{min-width:0;flex:1;}
+.sidebar-title .icon{display:flex;flex:none;}
+.sidebar-title-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sidebar-header-actions{display:flex;align-items:center;gap:10px;flex:none;}
+.sidebar-expand-btn{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;font:inherit;font-size:.82rem;font-weight:600;color:var(--primary);background:var(--primary-soft);border:1px solid var(--primary-border);border-radius:8px;padding:8px 12px;cursor:pointer;}
+.sidebar-expand-btn:hover{background:#e0e7ff;}
+.video-evidence video{display:block;width:100%;max-width:100%;height:auto;max-height:58dvh;aspect-ratio:16 / 9;object-fit:contain;box-sizing:border-box;background:#0b1020;border-radius:10px;}
+.video-evidence p{font-size:.82rem;color:var(--text-sub);line-height:1.6;margin:10px 0 0;}
+.sidebar-body .markdown-content{overflow-wrap:anywhere;}
+.sidebar-body .markdown-content img{max-width:100%;height:auto;}
+.sidebar-body .markdown-content pre{max-width:100%;overflow-x:auto;}
+@media(max-width:860px){
+  .sidebar-resize-handle,.sidebar-expand-btn{display:none;}
+  .sidebar-header{padding:16px;gap:10px;}
+  .sidebar-body{padding:16px 16px 28px;}
+  .video-evidence video{max-height:45dvh;border-radius:8px;}
+  .sidebar-title{font-size:.9rem;}
+}
 </style>
