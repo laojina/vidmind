@@ -305,7 +305,7 @@ public class VideoContextService {
     }
 
     private void runCommand(List<String> command, List<Long> timestamps) throws Exception {
-        Path logPath = Files.createTempFile("dovideo-ffmpeg-", ".log");
+        Path logPath = Files.createTempFile("vidmind-ffmpeg-", ".log");
         Process process = null;
         try {
             process = new ProcessBuilder(command)

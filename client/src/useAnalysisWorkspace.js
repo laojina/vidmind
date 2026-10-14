@@ -726,7 +726,7 @@ function formatDuration(value) {
 }
 
 function goalDraftKey(mediaId) {
-  return `dovideo:goal:${mediaId}`
+  return `vidmind:goal:${mediaId}`
 }
 
 function loadGoalDraft(mediaId) {
@@ -747,7 +747,7 @@ function saveGoalDraft(mediaId, goal) {
 }
 
 function modeDraftKey(mediaId) {
-  return `dovideo:mode:${mediaId}`
+  return `vidmind:mode:${mediaId}`
 }
 
 function loadModeDraft(mediaId) {

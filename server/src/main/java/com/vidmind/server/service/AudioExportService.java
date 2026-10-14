@@ -29,7 +29,7 @@ public class AudioExportService {
         Path outputPath = null;
         Process process = null;
         try {
-            outputPath = Files.createTempFile("dovideo-audio-", ".mp3");
+            outputPath = Files.createTempFile("vidmind-audio-", ".mp3");
             process = new ProcessBuilder(
                     "ffmpeg", "-y", "-i", inputPath,
                     "-vn", "-acodec", "libmp3lame", "-q:a", "2", outputPath.toString())

@@ -132,7 +132,7 @@ public class ChunkUploadService {
                         "分片尚未全部上传完成（已传 " + uploadedChunks.size() + "/" + totalChunks + "）");
             }
 
-            Path mergedFile = Files.createTempFile("dovideo-merged-", fileSuffix(filename));
+            Path mergedFile = Files.createTempFile("vidmind-merged-", fileSuffix(filename));
             MessageDigest digest = md5Digest();
             try {
                 try (OutputStream fileOutput = Files.newOutputStream(mergedFile);

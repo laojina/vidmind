@@ -27,7 +27,7 @@ public class OcrUtils {
         Process process = null;
         Path output = null;
         try {
-            output = Files.createTempFile("dovideo-ocr-", ".txt");
+            output = Files.createTempFile("vidmind-ocr-", ".txt");
             process = new ProcessBuilder(
                     ocrCommand, image.getAbsolutePath(), "stdout", "-l", "chi_sim+eng")
                     .redirectErrorStream(true)

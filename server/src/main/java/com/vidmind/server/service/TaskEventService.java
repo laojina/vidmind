@@ -26,7 +26,7 @@ public class TaskEventService implements MessageListener {
 
     public static final String ANALYSIS = "analysis";
     public static final String TRANSCRIPTION = "transcription";
-    public static final String REDIS_CHANNEL = "dovideo:task-events";
+    public static final String REDIS_CHANNEL = "vidmind:task-events";
 
     private static final Logger log = LoggerFactory.getLogger(TaskEventService.class);
     private static final long STREAM_TIMEOUT_MS = 30 * 60 * 1000L;
