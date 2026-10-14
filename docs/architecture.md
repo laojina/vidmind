@@ -43,3 +43,9 @@ flowchart LR
 - 任务提交接口不等待分析完成，这是把长任务从 HTTP 同步链路中剥离的关键。
 - ASR 负责“听”，OCR 负责“看”，VideoContext 负责把两者按时间轴对齐。
 - Agent 不是连续调三次 LLM，而是 Planner 拆目标、Executor 生成带证据结论、Critic 校验并反馈，最多两轮。
+
+## 模型接入与实现边界
+
+LangChain4j 在 `DeepSeekUtils` 提供 ChatModel 和消息类型；Agent 编排和 RAG 检索由业务服务实现。证据校验限定来源标签、时间窗和原文，不构成语义正确性的证明。轮次耗尽时可返回带警告结果。
+
+数据库事务不包含 Redis、MinIO 与 RocketMQ；当前通过锁、Checkpoint 和失败记录降低重复执行风险，不能保证跨系统恰好一次。源码边界和后续测试方案见 [工程风险](engineering-risks.md)。

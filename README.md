@@ -102,6 +102,18 @@ cp .env.example .env
 
 ### 2. 启动中间件
 
+直接使用 Docker Compose（Windows PowerShell、Linux 和 macOS 均可）：
+
+```text
+docker compose --env-file .env config --quiet
+docker compose --env-file .env up -d
+docker compose --env-file .env ps
+```
+
+Windows 可用 `Copy-Item .env.example .env` 创建配置。在启动后端前，将 `.env` 中的键值设置为进程环境变量或 IDE 运行配置；Spring Boot 不会自动读取仓库根目录的 `.env`。注意去掉模板中 DB_URL 两侧的单引号。Compose 的 running 状态不代表 Broker 和所有依赖均已可用。
+
+Linux/macOS 推荐通过下述脚本检查依赖并等待中间件：
+
 ```bash
 ./scripts/dev-up.sh
 ```
