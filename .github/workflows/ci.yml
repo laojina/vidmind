@@ -17,6 +17,10 @@ jobs:
         run: |
           bash -n scripts/dev-up.sh
           docker compose --env-file .env.example config --quiet
+          if git grep -inE 'do[v]ideo(ai)?' -- .; then
+            echo 'Legacy project branding remains in tracked source files.' >&2
+            exit 1
+          fi
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
