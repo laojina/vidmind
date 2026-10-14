@@ -38,4 +38,20 @@ class EvidenceVerificationServiceTest {
 
         assertFalse(service.supported(context, evidence));
     }
+
+    @Test
+    void rejectsUnknownSourceContainingARecognizedSubstring() {
+        assertFalse(service.supported(context, new AnalysisResult.Evidence(
+                125_000, "NOT_OCR", "根节点、左子树、右子树", "前序遍历顺序")));
+        assertFalse(service.supported(context, new AnalysisResult.Evidence(
+                125_000, "ASR_UNVERIFIED", "二叉树", "课程主题")));
+    }
+
+    @Test
+    void treatsTimeWindowsAsHalfOpenAndAcceptsCombinedSources() {
+        assertTrue(service.supported(context, new AnalysisResult.Evidence(
+                120_000, "asr+ocr", "二叉树", "课程主题")));
+        assertFalse(service.supported(context, new AnalysisResult.Evidence(
+                180_000, "ASR", "二叉树", "课程主题")));
+    }
 }
