@@ -76,7 +76,12 @@ public class VideoEvidenceRetrievalService {
                         .map(segment -> scoreSegment(intent, chunk.score(), segment)))
                 .sorted(Comparator.comparingDouble(ScoredSegment::score).reversed()
                         .thenComparingLong(result -> result.segment().startMs()))
-                .toList();
+                // Overlapping chunks may recall the same evidence. Keep its highest ranked occurrence.
+                .collect(java.util.stream.Collectors.toMap(
+                        result -> result.segment().startMs() + ":" + result.segment().endMs(),
+                        java.util.function.Function.identity(), (first, duplicate) -> first,
+                        LinkedHashMap::new))
+                .values().stream().toList();
     }
 
     public void index(Long mediaId, List<VideoChunk> chunks) {
