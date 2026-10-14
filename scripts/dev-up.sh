@@ -31,7 +31,7 @@ for variable in \
   fi
 done
 
-if [[ ! -d mysql/data/mysql && "${DB_USERNAME:-}" != "${MYSQL_APP_USER:-dovideo}" ]]; then
+if [[ ! -d mysql/data/mysql && "${DB_USERNAME:-}" != "${MYSQL_APP_USER:-vidmind}" ]]; then
   echo "DB_USERNAME and MYSQL_APP_USER must match for a fresh database." >&2
   exit 1
 fi
