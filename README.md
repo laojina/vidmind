@@ -44,6 +44,7 @@ LangChain4j 的实际使用位置是 `DeepSeekUtils` 中的 `OpenAiChatModel`、
 | 模型接入 | `DeepSeekUtils`、`EmbeddingUtils`、`AliyunAsrUtils` | ChatModel、向量与 ASR API；ASR 实际默认是 SiliconFlow，类名是历史命名 |
 | 受控 Agent | `AgentLoopService`、`EvidenceVerificationService` | 规划、执行、批评、结构与引用校验、预算终止 |
 | 持久化恢复 | `AgentCheckpointService`、`AgentCheckpointRepository` | MySQL 持久化与提交后 Redis 缓存同步 |
+| 任务代次状态机 | `AnalysisTaskLifecycleService`、`AgentCheckpointMapper` | 登记提交/重放代次、条件状态转换与终态去重 |
 | 观测和失败处理 | `AgentTelemetry`、`TaskEventService`、`FailedAnalysisTaskService` | 估算 token/成本、阶段 SSE、失败台账与人工重放 |
 
 ## 项目难点与当前解决方案
@@ -51,6 +52,8 @@ LangChain4j 的实际使用位置是 `DeepSeekUtils` 中的 `OpenAiChatModel`、
 长视频文本分块采用 5 分钟核心窗口，左右各纳入 60 秒重叠文本（首块向零截断）。边界处的解释与后续结论可进入相邻块的摘要/Embedding，减少上下文割裂；检索按原始时间范围去重，避免重复证据挤占上下文。重叠会增加索引与摘要调用输入，召回改善仍需标注集验证。既有 Checkpoint 分块不会自动重建，需要用新视频或显式重建索引验收。
 
 异步消费默认最多 3 次执行尝试。暂态失败交由 RocketMQ 重投，永久失败或次数耗尽进入失败台账/失败主题；失败主题投递自身失败时不再重新跑模型。锁竞争请求重投而非直接确认，已有持久结果也可在 Redis 完成标记过期后拦截重复执行。Broker 用尽重投次数后进入自身 DLQ，需运维检查 Broker DLQ 与应用失败主题两处；这仍不是跨系统恰好一次保证。
+
+任务状态机为每次新提交和人工重放登记 UUID 代次，保存在现有 MySQL `agent_checkpoints` 中：`QUEUED → RUNNING → COMPLETED / FAILED / DEAD_LETTERED`，暂态失败走 `RUNNING → RETRYING → RUNNING`。状态变更使用数据库条件更新，已结束的代次不允许回退；重复修订消息也不会重新开始修订。重放创建新代次，旧终态保留。RUNNING 恢复只允许在消费者重新取得 Redisson 锁后进行，结合阶段 Checkpoint 续跑；旧版无 taskId 消息兼容原逻辑。状态机保证代次终态幂等，并不保证外部模型调用恰好一次。
 
 1. **长任务不能占住 HTTP 请求。** 分析进入 RocketMQ，SSE 展示阶段。锁和幂等键减少重复工作，但不能宣称跨 Redis、MQ、MySQL 的 exactly-once。
 2. **数小时视频不能全部塞进 prompt。** 以 5 分钟知识块摘要和向量召回筛选原始片段，关键词与 OCR 补充召回；默认 TopK 为 3，再施加上下文字符预算。没有相似度阈值，召回质量需要数据集验证。
@@ -69,6 +72,7 @@ LangChain4j 的实际使用位置是 `DeepSeekUtils` 中的 `OpenAiChatModel`、
 | 异步与缓存 | RocketMQ 5.3.4、Redis 7.4、Redisson | 异步削峰、状态缓存、限流、锁与消费幂等 |
 | 数据与存储 | MySQL 8、MinIO、Qdrant | 业务数据、视频对象、Checkpoint 与向量检索 |
 | 视频与 AI | FFmpeg、Tesseract、LangChain4j、DeepSeek、TeleSpeechASR、BGE-M3 | 音视频处理、多模态解析、Agent 推理与 Embedding |
+| 任务状态机 | MySQL 条件更新、UUID 任务代次、Redisson 锁 | 提交/重放身份、合法状态转换、终态去重与恢复 |
 | 部署 | Docker Compose | 本地中间件编排 |
 
 ## 本地运行
@@ -161,6 +165,8 @@ npm run dev
 
 ### 常见问题
 
+本地部署踩坑记录：系统默认 Java 可能低于 21，必须同时核对 `JAVA_HOME` 和实际 `java -version`；JDK 23+ 运行 Maven 时可加 `-Dmaven.compiler.proc=full` 启用 Lombok 处理。持久化数据库不会因 `.env.example` 改名自动创建新账号。RocketMQ NameServer 可连接也不代表 Broker 宣告地址可达，虚拟机部署需核对 `broker.conf` 与宿主机网络。已有分块 Checkpoint 会继续复用旧结果，验证重叠策略应使用新视频。新状态机复用原检查点表，无新增 Flyway 迁移，但多实例部署需统一升级消息生产与消费端，旧版无 taskId 消息仅走兼容路径。
+
 | 现象 | 处理方式 |
 | :--- | :--- |
 | 后端无法连接 MySQL 或 Redis | 运行 `docker compose --env-file .env ps`，确认服务健康且 `.env` 密码一致 |
@@ -191,7 +197,7 @@ rocketmq/      Broker 配置
 
 提交采用 `feat`、`fix`、`docs`、`chore` 前缀，记录实际改动。早期历史是导入完整基线，不能根据提交说明推断功能在该日期从零开发。旧说明已规范化，原作者与日期保留。后续改动拆成配置、运行时名称、边界修复、文档和版本提交。
 
-`v1.0.0` 是本次整理后的源码版本标记，不代表已经完成生产压测或所有外部服务验收。见 [版本说明](docs/releases/v1.0.0.md)。
+`v1.0.0` 保持指向原始整理版本。后续 master 增量增加重叠分块、消费重试增强与任务代次状态机；标签不随这些改动移动。该版本标记不代表已完成生产压测或外部服务验收。见 [版本说明](docs/releases/v1.0.0.md)。
 
 ## 项目预览
 

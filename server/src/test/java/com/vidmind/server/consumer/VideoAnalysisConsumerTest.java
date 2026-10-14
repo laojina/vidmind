@@ -25,13 +25,15 @@ class VideoAnalysisConsumerTest {
     private final FailedAnalysisTaskService failures = mock(FailedAnalysisTaskService.class);
     private final MediaService media = mock(MediaService.class);
     private final TaskEventService events = mock(TaskEventService.class);
+    private final AnalysisTaskLifecycleService lifecycle = mock(AnalysisTaskLifecycleService.class);
     private VideoAnalysisConsumer consumer;
     private final AnalysisTaskMsg msg = new AnalysisTaskMsg(7L, AnalysisTaskMsg.START_ANALYSIS,
             "media-7", "summarize", "GENERAL");
 
     @BeforeEach
     void setup() {
-        consumer = new VideoAnalysisConsumer(ai, redisson, redis, checkpoints, mq, failures, media, events, "dead");
+        consumer = new VideoAnalysisConsumer(ai, redisson, redis, checkpoints, mq, failures, media, events, "dead", lifecycle);
+        when(lifecycle.begin(any())).thenReturn(true);
         when(redisson.getLock(anyString())).thenReturn(lock);
         when(lock.tryLock()).thenReturn(true);
         when(lock.isHeldByCurrentThread()).thenReturn(true);
@@ -67,6 +69,7 @@ class VideoAnalysisConsumerTest {
         verify(redis, never()).delete(anyCollection());
         verifyNoInteractions(failures, mq);
         verify(lock).unlock();
+        verify(lifecycle).retry(msg);
     }
 
     @Test
@@ -76,6 +79,7 @@ class VideoAnalysisConsumerTest {
         consumer.onMessage(msg);
         verify(failures).record(eq(msg), eq(3L), any());
         verify(mq).convertAndSend("dead", msg);
+        verify(lifecycle).deadLetter(msg);
     }
 
     @Test
@@ -90,8 +94,29 @@ class VideoAnalysisConsumerTest {
 
     @Test
     void cleanupFailureStillReleasesLock() {
+        when(checkpoints.loadResult(7L, "summarize", AnalysisMode.GENERAL)).thenReturn(null,
+                new AgentState("summarize", null,
+                        new AnalysisResult("done", List.of(), List.of(), List.of(), List.of()), null, 1));
         doThrow(new IllegalStateException("redis unavailable")).when(redis).delete(anyCollection());
         assertThrows(IllegalStateException.class, () -> consumer.onMessage(msg));
         verify(lock).unlock();
+    }
+
+    @Test
+    void terminalRevisionRedeliveryDoesNotRestartRevisionOrRemoveNewActiveMarker() {
+        msg.setAction(AnalysisTaskMsg.REVISE_ANALYSIS);
+        when(lifecycle.begin(msg)).thenReturn(false);
+        consumer.onMessage(msg);
+        verifyNoInteractions(ai);
+        verify(checkpoints, never()).beginStagedRevision(anyLong(), anyString(), any());
+        verify(redis, never()).delete(anyCollection());
+        verify(lock).unlock();
+    }
+
+    @Test
+    void missingPersistedResultCannotCompleteGeneration() {
+        assertThrows(IllegalStateException.class, () -> consumer.onMessage(msg));
+        verify(lifecycle, never()).complete(any());
+        verify(lifecycle).retry(msg);
     }
 }

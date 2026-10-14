@@ -13,6 +13,8 @@ public class AnalysisTaskMsg implements Serializable {
     private String userGoal;
     /** 分析模式名(见 {@link AnalysisMode})。可空,历史消息或缺省时按 GENERAL 处理。 */
     private String mode;
+    /** Stable across broker redeliveries; a new submission/replay receives a new generation ID. */
+    private String taskId;
 
     public AnalysisTaskMsg() {}
 
@@ -39,6 +41,8 @@ public class AnalysisTaskMsg implements Serializable {
     public void setUserGoal(String userGoal) { this.userGoal = userGoal; }
     public String getMode() { return mode; }
     public void setMode(String mode) { this.mode = mode; }
+    public String getTaskId() { return taskId; }
+    public void setTaskId(String taskId) { this.taskId = taskId; }
 
     public boolean isRevision() {
         return REVISE_ANALYSIS.equals(action);

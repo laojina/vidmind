@@ -37,6 +37,7 @@ public class AnalysisDispatchService {
     private final RedissonClient redissonClient;
     private final TaskEventService taskEventService;
     private final String analysisTopic;
+    private final AnalysisTaskLifecycleService lifecycle;
 
     public AnalysisDispatchService(AiService aiService,
                                    MediaService mediaService,
@@ -45,7 +46,7 @@ public class AnalysisDispatchService {
                                    RedissonClient redissonClient,
                                    TaskEventService taskEventService,
                                    @Value("${rocketmq.topic.video-analysis:video-analysis-topic}")
-                                   String analysisTopic) {
+                                   String analysisTopic, AnalysisTaskLifecycleService lifecycle) {
         this.aiService = aiService;
         this.mediaService = mediaService;
         this.redisTemplate = redisTemplate;
@@ -53,6 +54,7 @@ public class AnalysisDispatchService {
         this.redissonClient = redissonClient;
         this.taskEventService = taskEventService;
         this.analysisTopic = analysisTopic;
+        this.lifecycle = lifecycle;
     }
 
     /** 兼容旧调用方:未指定模式时按 GENERAL 提交。 */
@@ -80,9 +82,9 @@ public class AnalysisDispatchService {
             }
             // 旧结果先留着。消费者真正接手后再切 Checkpoint，MQ 投递失败时用户还有结果可看。
             if (revision != null) aiService.stageRevision(revision, resolvedMode);
-            rocketMQTemplate.convertAndSend(
-                    analysisTopic,
-                    new AnalysisTaskMsg(mediaId, action, contentHash, goal, resolvedMode.name()));
+            AnalysisTaskMsg message = new AnalysisTaskMsg(mediaId, action, contentHash, goal, resolvedMode.name());
+            lifecycle.register(message);
+            rocketMQTemplate.convertAndSend(analysisTopic, message);
         } catch (RuntimeException e) {
             redisTemplate.delete(activeKey);
             if (revision != null) aiService.cancelStagedRevision(mediaId, goal, resolvedMode);

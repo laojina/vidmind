@@ -42,18 +42,20 @@ public class FailedAnalysisTaskService {
     private final StringRedisTemplate redisTemplate;
     private final TaskEventService taskEventService;
     private final String analysisTopic;
+    private final AnalysisTaskLifecycleService lifecycle;
 
     public FailedAnalysisTaskService(FailedAnalysisTaskMapper taskMapper,
                                      RocketMQTemplate rocketMQTemplate,
                                      StringRedisTemplate redisTemplate,
                                      TaskEventService taskEventService,
                                      @Value("${rocketmq.topic.video-analysis:video-analysis-topic}")
-                                     String analysisTopic) {
+                                     String analysisTopic, AnalysisTaskLifecycleService lifecycle) {
         this.taskMapper = taskMapper;
         this.rocketMQTemplate = rocketMQTemplate;
         this.redisTemplate = redisTemplate;
         this.taskEventService = taskEventService;
         this.analysisTopic = analysisTopic;
+        this.lifecycle = lifecycle;
     }
 
     public void record(AnalysisTaskMsg message, long attempts, Throwable error) {
@@ -117,8 +119,10 @@ public class FailedAnalysisTaskService {
         boolean dispatched = false;
         try {
             redisTemplate.delete(AnalysisTaskKeys.attempts(contentHash, goalDigest));
-            rocketMQTemplate.convertAndSend(analysisTopic, new AnalysisTaskMsg(
-                    task.getMediaId(), task.getAction(), contentHash, task.getUserGoal(), mode.name()));
+            AnalysisTaskMsg replay = new AnalysisTaskMsg(
+                    task.getMediaId(), task.getAction(), contentHash, task.getUserGoal(), mode.name());
+            lifecycle.register(replay); // Replay starts a fresh generation; its old terminal state stays intact.
+            rocketMQTemplate.convertAndSend(analysisTopic, replay);
             dispatched = true;
             task.setStatus(STATUS_REQUEUED);
             task.setUpdatedAt(LocalDateTime.now());

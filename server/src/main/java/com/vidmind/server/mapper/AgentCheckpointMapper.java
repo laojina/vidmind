@@ -5,9 +5,26 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface AgentCheckpointMapper {
+
+    // Reuse the existing durable journal; duplicate registration must not reset a terminal state.
+    @Insert("""
+            INSERT INTO agent_checkpoints(media_id, checkpoint_key, stage, payload)
+            VALUES(#{mediaId}, #{key}, 'QUEUED', #{identity})
+            ON DUPLICATE KEY UPDATE checkpoint_key = VALUES(checkpoint_key)
+            """)
+    void registerTask(@Param("mediaId") Long mediaId, @Param("key") String key,
+                      @Param("identity") String identity);
+
+    @Update("""
+            UPDATE agent_checkpoints SET stage = #{next}, updated_at = CURRENT_TIMESTAMP(3)
+            WHERE media_id = #{mediaId} AND checkpoint_key = #{key} AND stage = #{expected}
+            """)
+    int transitionTask(@Param("mediaId") Long mediaId, @Param("key") String key,
+                       @Param("expected") String expected, @Param("next") String next);
 
     @Select("SELECT payload FROM agent_checkpoints WHERE media_id = #{mediaId} AND checkpoint_key = #{checkpointKey}")
     String findPayload(@Param("mediaId") Long mediaId,
