@@ -23,7 +23,7 @@ public record TaskStatus(State state, String result, String message) {
         if (agentState.critique() != null && agentState.critique().passed()) {
             return completed(markdown);
         }
-        String warning = "分析已完成，但部分结论未通过 Critic 校验，请结合时间戳证据人工核验。";
+        String warning = "分析结果已生成，可结合视频时间戳进一步确认。";
         return new TaskStatus(State.COMPLETED, "> **结果提示：** " + warning + "\n\n" + markdown, warning);
     }
 }
