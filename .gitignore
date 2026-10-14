@@ -21,3 +21,7 @@ config/
 docs/_local/
 .workbuddy/
 client/backup-ui-20260909/
+
+# Personal Windows launchers (kept locally)
+/启动前端.bat
+/启动虚拟机.bat
